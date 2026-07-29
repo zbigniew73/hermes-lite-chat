@@ -42,3 +42,50 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Closing the tab kills that PTY's `hermes chat` process (it doesn't "pause" — resuming the same session later continues from whatever was already saved to `state.db`).
 - Two tabs resuming the *same* session concurrently behave like two terminals attached to the same `--resume` id — governed by Hermes Agent's own active-session logic, not this app.
 - `/api/hermes/model` and `/api/hermes/sessions` are read-only lookups (YAML/SQLite); this app never writes to Hermes Agent's config or session database directly.
+
+---
+
+# hermes-lite-chat (wersja polska)
+
+Terminal webowy dla lokalnej instalacji [Hermes Agent](https://hermes-agent.nousresearch.com/) (`~/.hermes`). Uruchamia prawdziwe `hermes chat --cli` w PTY i strumieniuje je do terminala `xterm.js` w przeglądarce — to nie jest reimplementacja, tylko dosłownie ten sam program CLI — dzięki czemu korzystanie z narzędzi, prompty zatwierdzania i strumieniowanie zachowują się dokładnie tak samo jak w prawdziwym terminalu. Pasek boczny wyświetla listę istniejących sesji Hermesa (tylko do odczytu, bezpośrednio z `~/.hermes/state.db`), dzięki czemu można wznowić dowolną z nich albo rozpocząć nową rozmowę.
+
+Aplikacja nie ma własnych kluczy API: Hermes Agent zarządza swoimi danymi uwierzytelniającymi i konfiguracją modelu (`~/.hermes/config.yaml`) samodzielnie.
+
+## Instalacja
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+```bash
+cp .env.example .env
+```
+
+Plik `.env` kontroluje:
+- `HERMES_HOME` / `HERMES_BIN` — potrzebne tylko wtedy, gdy Hermes Agent jest zainstalowany gdzie indziej niż `~/.hermes`, albo `hermes` nie jest dostępne w `PATH`.
+- `HOST` (domyślnie `0.0.0.0`) / `PORT` (domyślnie `8000`) — własny adres nasłuchu tej aplikacji, **niezależny od dashboardu Hermes Agent na porcie 9119** (brak jakiegokolwiek powiązania czy konfliktu — obie usługi mogą działać jednocześnie). `HOST=0.0.0.0` udostępnia aplikację innym urządzeniom w Twojej sieci lokalnej; użyj `HOST=127.0.0.1`, żeby ograniczyć dostęp tylko do tej maszyny.
+- `RELOAD=true` — opcjonalny tryb deweloperski z automatycznym przeładowaniem przy zmianie plików.
+- `ADMIN_USERNAME` / `ADMIN_PASSWORD` — login **tylko na pierwsze uruchomienie** (domyślnie `admin` / `pass123!`), używany wyłącznie przy pierwszym starcie aplikacji. Zmień go później z poziomu paska bocznego ("Change password") — od tego momentu prawdziwe dane logowania są przechowywane jako hash (scrypt) w `~/.config/hermes-lite-chat/auth.json`, a edycja `.env` nie ma już żadnego znaczenia.
+
+## Uruchomienie
+
+```bash
+python -m app.main
+```
+
+Automatycznie odczytuje `HOST`/`PORT` (oraz `RELOAD`) z pliku `.env`. Otwórz `http://<adres-IP-tej-maszyny-w-sieci-lokalnej>:8000` z dowolnego urządzenia w Twojej sieci (albo `http://localhost:8000` z tej samej maszyny).
+
+Alternatywnie, jeśli wolisz bezpośrednio CLI uvicorn (`HOST`/`PORT` z `.env` *nie* są wtedy odczytywane automatycznie — trzeba podać je jawnie jako flagi):
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## Uwagi i zastrzeżenia
+
+- Cała aplikacja (pliki statyczne, API oraz WebSocket terminala) jest zabezpieczona uwierzytelnianiem HTTP Basic Auth. Każdy, kto *faktycznie* się zaloguje, ma te same możliwości co lokalna sesja terminalowa `hermes` — pełny dostęp do narzędzi, powłoki i przeglądarki. Uruchamiaj tę aplikację wyłącznie w sieci, której ufasz, i koniecznie zmień domyślne hasło.
+- Zamknięcie karty przeglądarki kończy proces `hermes chat` powiązany z daną sesją PTY (to nie jest "pauza" — wznowienie tej samej sesji później kontynuuje od tego, co zdążyło się zapisać do `state.db`).
+- Dwie karty wznawiające jednocześnie **tę samą** sesję zachowują się jak dwa terminale podłączone pod to samo `--resume` id — reguluje to własna logika aktywnej sesji Hermes Agent, a nie ta aplikacja.
+- `/api/hermes/model` i `/api/hermes/sessions` to zapytania wyłącznie do odczytu (YAML/SQLite); ta aplikacja nigdy nie zapisuje bezpośrednio do konfiguracji ani bazy sesji Hermes Agent.
