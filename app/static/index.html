@@ -4,19 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>hermes-lite-chat</title>
+  <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <div id="app">
-    <header>
-      <h1>hermes-lite-chat</h1>
-    </header>
-    <main id="messages"></main>
-    <form id="composer">
-      <textarea id="input" placeholder="Message Hermes..." rows="1"></textarea>
-      <button id="send" type="submit">Send</button>
-    </form>
+    <aside id="sidebar">
+      <header>
+        <h1>hermes-lite-chat</h1>
+        <div id="model-info">loading model…</div>
+        <button id="new-chat">+ New chat</button>
+      </header>
+      <div id="session-list"></div>
+    </aside>
+    <main id="terminal-pane">
+      <div id="placeholder">Select a session or start a new chat.</div>
+      <div id="terminal"></div>
+    </main>
   </div>
-  <script src="/chat.js"></script>
+  <script src="/vendor/xterm/xterm.js"></script>
+  <script src="/vendor/xterm/addon-fit.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>

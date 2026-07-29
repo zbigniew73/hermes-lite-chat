@@ -1,23 +1,27 @@
+import asyncio
 import json
 import os
+import shutil
 from pathlib import Path
 
-import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
 load_dotenv()
 
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "nousresearch/hermes-3-llama-3.1-405b")
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+from app import hermes_data, pty_bridge  # noqa: E402  (import after load_dotenv so env overrides apply)
 
-if not OPENROUTER_API_KEY:
+if not shutil.which(pty_bridge.HERMES_BIN):
     raise RuntimeError(
-        "OPENROUTER_API_KEY is not set. Copy .env.example to .env and add your key."
+        f"hermes CLI not found ('{pty_bridge.HERMES_BIN}'). "
+        "Install Hermes Agent or set HERMES_BIN to its path."
+    )
+
+if not hermes_data.STATE_DB_PATH.exists():
+    raise RuntimeError(
+        f"Hermes state db not found at {hermes_data.STATE_DB_PATH}. "
+        "Set HERMES_HOME if Hermes Agent lives somewhere other than ~/.hermes."
     )
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -25,47 +29,65 @@ STATIC_DIR = Path(__file__).parent / "static"
 app = FastAPI(title="hermes-lite-chat")
 
 
-class ChatMessage(BaseModel):
-    role: str
-    content: str
+@app.get("/api/hermes/model")
+async def get_model():
+    return hermes_data.get_current_model()
 
 
-class ChatRequest(BaseModel):
-    messages: list[ChatMessage]
+@app.get("/api/hermes/sessions")
+async def get_sessions(limit: int = 50):
+    return hermes_data.list_sessions(limit=limit)
 
 
-@app.post("/api/chat")
-async def chat(req: ChatRequest):
-    payload = {
-        "model": OPENROUTER_MODEL,
-        "messages": [m.model_dump() for m in req.messages],
-        "stream": True,
-    }
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
+@app.websocket("/ws/pty")
+async def ws_pty(websocket: WebSocket, session_id: str | None = None):
+    await websocket.accept()
 
-    async def event_stream():
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream(
-                "POST", OPENROUTER_URL, json=payload, headers=headers
-            ) as resp:
-                if resp.status_code != 200:
-                    body = await resp.aread()
-                    yield f"data: {json.dumps({'error': body.decode(errors='replace')})}\n\n"
-                    return
-                async for line in resp.aiter_lines():
-                    if not line:
-                        continue
-                    yield f"{line}\n\n"
+    proc, master_fd = pty_bridge.spawn_hermes_pty(session_id)
+    loop = asyncio.get_running_loop()
+    os.set_blocking(master_fd, False)
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    def on_readable():
+        try:
+            data = os.read(master_fd, 65536)
+        except OSError:
+            data = b""
+        if data:
+            asyncio.ensure_future(websocket.send_bytes(data))
+        else:
+            loop.remove_reader(master_fd)
 
+    loop.add_reader(master_fd, on_readable)
 
-@app.get("/healthz")
-async def healthz():
-    return {"status": "ok", "model": OPENROUTER_MODEL}
+    try:
+        while True:
+            message = await websocket.receive()
+            if message["type"] == "websocket.disconnect":
+                break
+
+            data = message.get("bytes")
+            if data is not None:
+                os.write(master_fd, data)
+                continue
+
+            text = message.get("text")
+            if text is not None:
+                try:
+                    control = json.loads(text)
+                except ValueError:
+                    continue
+                if control.get("type") == "resize":
+                    pty_bridge.resize(
+                        master_fd,
+                        int(control.get("rows", 24)),
+                        int(control.get("cols", 80)),
+                    )
+    finally:
+        try:
+            loop.remove_reader(master_fd)
+        except (ValueError, OSError):
+            pass
+        await loop.run_in_executor(None, pty_bridge.terminate, proc, master_fd)
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
