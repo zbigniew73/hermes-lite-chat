@@ -16,6 +16,18 @@
         <button id="new-chat">+ New chat</button>
       </header>
       <div id="session-list"></div>
+      <footer id="account-box">
+        <button id="change-password-btn">Change password</button>
+        <form id="change-password-form" hidden>
+          <input type="password" id="current-password" placeholder="Current password" autocomplete="current-password" required />
+          <input type="password" id="new-password" placeholder="New password" autocomplete="new-password" required />
+          <div class="form-actions">
+            <button type="submit">Save</button>
+            <button type="button" id="cancel-password-btn">Cancel</button>
+          </div>
+          <div id="change-password-msg"></div>
+        </form>
+      </footer>
     </aside>
     <main id="terminal-pane">
       <div id="placeholder">Select a session or start a new chat.</div>

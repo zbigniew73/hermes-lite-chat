@@ -121,5 +121,53 @@ function sendResize() {
 
 newChatBtn.addEventListener("click", () => openTerminal(null));
 
+const changePasswordBtn = document.getElementById("change-password-btn");
+const changePasswordForm = document.getElementById("change-password-form");
+const cancelPasswordBtn = document.getElementById("cancel-password-btn");
+const currentPasswordInput = document.getElementById("current-password");
+const newPasswordInput = document.getElementById("new-password");
+const changePasswordMsg = document.getElementById("change-password-msg");
+
+changePasswordBtn.addEventListener("click", () => {
+  changePasswordForm.hidden = !changePasswordForm.hidden;
+  changePasswordMsg.textContent = "";
+  changePasswordMsg.className = "";
+});
+
+cancelPasswordBtn.addEventListener("click", () => {
+  changePasswordForm.hidden = true;
+  changePasswordForm.reset();
+  changePasswordMsg.textContent = "";
+  changePasswordMsg.className = "";
+});
+
+changePasswordForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  changePasswordMsg.textContent = "";
+  changePasswordMsg.className = "";
+  try {
+    const res = await fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        current_password: currentPasswordInput.value,
+        new_password: newPasswordInput.value,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      changePasswordMsg.textContent = body.detail || "Failed to change password.";
+      changePasswordMsg.className = "error";
+      return;
+    }
+    changePasswordMsg.textContent = "Password changed. Reload and log in with the new one.";
+    changePasswordMsg.className = "success";
+    changePasswordForm.reset();
+  } catch {
+    changePasswordMsg.textContent = "Network error.";
+    changePasswordMsg.className = "error";
+  }
+});
+
 loadModelInfo();
 loadSessions();

@@ -20,6 +20,7 @@ cp .env.example .env
 - `HERMES_HOME` / `HERMES_BIN` — only needed if Hermes Agent lives somewhere other than `~/.hermes`, or `hermes` isn't on `PATH`.
 - `HOST` (default `0.0.0.0`) / `PORT` (default `8000`) — this app's own bind address, **independent of Hermes Agent's dashboard on port 9119** (no relation, no conflict — both can run at the same time). `HOST=0.0.0.0` makes it reachable from other devices on your local network; use `HOST=127.0.0.1` to restrict it to this machine only.
 - `RELOAD=true` — optional dev auto-reload on file changes.
+- `ADMIN_USERNAME` / `ADMIN_PASSWORD` — **bootstrap-only** login (default `admin` / `pass123!`), used just the first time the app runs. Change it from the sidebar ("Change password") afterwards — the real credentials then live hashed (scrypt) in `~/.config/hermes-lite-chat/auth.json`, and editing `.env` after that has no effect.
 
 ## Run
 
@@ -37,7 +38,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## Notes / caveats
 
-- Anyone who can reach this page has the same capabilities as a local terminal session with `hermes` — full tool/shell/browser access. Only run this on a network you trust.
+- The whole app (static assets, API, and the terminal WebSocket) sits behind HTTP Basic Auth. Anyone who *does* log in has the same capabilities as a local terminal session with `hermes` — full tool/shell/browser access. Only run this on a network you trust, and change the default password.
 - Closing the tab kills that PTY's `hermes chat` process (it doesn't "pause" — resuming the same session later continues from whatever was already saved to `state.db`).
 - Two tabs resuming the *same* session concurrently behave like two terminals attached to the same `--resume` id — governed by Hermes Agent's own active-session logic, not this app.
 - `/api/hermes/model` and `/api/hermes/sessions` are read-only lookups (YAML/SQLite); this app never writes to Hermes Agent's config or session database directly.

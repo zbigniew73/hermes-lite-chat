@@ -5,12 +5,14 @@ import shutil
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 load_dotenv()
 
-from app import hermes_data, pty_bridge  # noqa: E402  (import after load_dotenv so env overrides apply)
+from app import auth_store, hermes_data, pty_bridge  # noqa: E402  (import after load_dotenv so env overrides apply)
+from app.auth_middleware import BasicAuthMiddleware  # noqa: E402
 
 if not shutil.which(pty_bridge.HERMES_BIN):
     raise RuntimeError(
@@ -24,9 +26,31 @@ if not hermes_data.STATE_DB_PATH.exists():
         "Set HERMES_HOME if Hermes Agent lives somewhere other than ~/.hermes."
     )
 
+# Only seeds the store the first time it doesn't exist yet — a password
+# changed later via /api/auth/change-password survives restarts.
+auth_store.ensure_bootstrap(
+    os.environ.get("ADMIN_USERNAME", "admin"),
+    os.environ.get("ADMIN_PASSWORD", "pass123!"),
+)
+
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="hermes-lite-chat")
+app.add_middleware(BasicAuthMiddleware)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/auth/change-password")
+async def change_password(req: ChangePasswordRequest):
+    if len(req.new_password) < 4:
+        raise HTTPException(status_code=400, detail="New password too short")
+    if not auth_store.change_password(req.current_password, req.new_password):
+        raise HTTPException(status_code=401, detail="Current password incorrect")
+    return {"ok": True}
 
 
 @app.get("/api/hermes/model")

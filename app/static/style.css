@@ -113,6 +113,79 @@ body {
   font-size: 0.75rem;
 }
 
+#account-box {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#change-password-btn,
+#account-box button {
+  font: inherit;
+  cursor: pointer;
+}
+
+#change-password-btn {
+  width: 100%;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--fg);
+  font-size: 0.8rem;
+}
+
+#change-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+#change-password-form input {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.form-actions button {
+  flex: 1;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--hover);
+  color: var(--fg);
+  font-size: 0.8rem;
+}
+
+.form-actions button[type="submit"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
+#change-password-msg {
+  font-size: 0.75rem;
+  min-height: 1.2em;
+}
+
+#change-password-msg.error {
+  color: #dc2626;
+}
+
+#change-password-msg.success {
+  color: #16a34a;
+}
+
 #terminal-pane {
   flex: 1;
   position: relative;
