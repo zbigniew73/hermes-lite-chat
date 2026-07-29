@@ -18,17 +18,36 @@ import subprocess
 import termios
 from pathlib import Path
 
+from app.hermes_data import HERMES_HOME
+
 HERMES_BIN = os.environ.get("HERMES_BIN") or shutil.which("hermes") or "hermes"
 
 # This app's own login secrets have no business being visible to the agent
-# process (or to anything the agent shells out to).
-_STRIPPED_ENV_VARS = ("ADMIN_USERNAME", "ADMIN_PASSWORD", "HERMES_LITE_AUTH_STORE")
+# process (or to anything the agent shells out to). HERMES_BIN is ours too:
+# it only tells *us* which executable to spawn and means nothing to the
+# `hermes` process itself, so it goes as well.
+_STRIPPED_ENV_VARS = (
+    "ADMIN_USERNAME",
+    "ADMIN_PASSWORD",
+    "HERMES_LITE_AUTH_STORE",
+    "HERMES_BIN",
+)
 
 
 def child_env() -> dict[str, str]:
     env = os.environ.copy()
     for name in _STRIPPED_ENV_VARS:
         env.pop(name, None)
+    # Never let this app's raw HERMES_HOME string through: .env.example ships
+    # the literal `HERMES_HOME=~/.hermes`, and Hermes Agent resolves its own
+    # home with a bare Path(val) — no .expanduser(). The child would take
+    # that as a *relative* directory named "~" under its cwd, find none of
+    # its config or API keys there, and drop into the interactive
+    # "hermes isn't configured yet / run: hermes setup" first-run prompt.
+    # Pass the already-expanded absolute path hermes_data resolved, which
+    # also keeps the child's home identical to the one we list sessions from
+    # (so --resume ids always match).
+    env["HERMES_HOME"] = str(HERMES_HOME)
     return env
 
 
