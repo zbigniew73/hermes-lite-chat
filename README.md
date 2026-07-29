@@ -12,19 +12,28 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`.env` is optional — only needed if Hermes Agent lives somewhere other than `~/.hermes`, or `hermes` isn't on `PATH`:
-
 ```bash
-cp .env.example .env   # then edit HERMES_HOME / HERMES_BIN if needed
+cp .env.example .env
 ```
+
+`.env` controls:
+- `HERMES_HOME` / `HERMES_BIN` — only needed if Hermes Agent lives somewhere other than `~/.hermes`, or `hermes` isn't on `PATH`.
+- `HOST` (default `0.0.0.0`) / `PORT` (default `8000`) — this app's own bind address, **independent of Hermes Agent's dashboard on port 9119** (no relation, no conflict — both can run at the same time). `HOST=0.0.0.0` makes it reachable from other devices on your local network; use `HOST=127.0.0.1` to restrict it to this machine only.
+- `RELOAD=true` — optional dev auto-reload on file changes.
 
 ## Run
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+python -m app.main
 ```
 
-Open http://localhost:8000 in your browser.
+Reads `HOST`/`PORT` (and `RELOAD`) from `.env` automatically. Open `http://<this machine's LAN IP>:8000` from any device on your network (or `http://localhost:8000` from this machine).
+
+Alternative, if you prefer the uvicorn CLI directly (`.env`'s `HOST`/`PORT` are *not* picked up this way — pass flags explicitly):
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
 ## Notes / caveats
 

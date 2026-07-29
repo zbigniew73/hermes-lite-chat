@@ -91,3 +91,14 @@ async def ws_pty(websocket: WebSocket, session_id: str | None = None):
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "app.main:app",
+        host=os.environ.get("HOST", "0.0.0.0"),
+        port=int(os.environ.get("PORT", 8000)),
+        reload=os.environ.get("RELOAD", "").lower() in ("1", "true", "yes"),
+    )
