@@ -17,15 +17,33 @@ CONFIG_PATH = HERMES_HOME / "config.yaml"
 STATE_DB_PATH = HERMES_HOME / "state.db"
 
 
+# Only these keys are ever echoed back to the browser. Whitelisting rather
+# than returning the whole `model:` subtree means a future config addition
+# (an api_key:, say) can't leak out through this endpoint.
+MODEL_PUBLIC_FIELDS = ("default", "provider")
+
+
 def get_current_model() -> dict:
-    with open(CONFIG_PATH) as f:
-        config = yaml.safe_load(f)
-    return config.get("model", {})
+    try:
+        with open(CONFIG_PATH) as f:
+            config = yaml.safe_load(f)
+    except (OSError, yaml.YAMLError):
+        return {}
+    if not isinstance(config, dict):
+        return {}
+    model = config.get("model")
+    if not isinstance(model, dict):
+        return {}
+    return {k: model[k] for k in MODEL_PUBLIC_FIELDS if k in model}
 
 
 def list_sessions(limit: int = 50) -> list[dict]:
-    uri = f"file:{STATE_DB_PATH}?mode=ro"
-    con = sqlite3.connect(uri, uri=True)
+    uri = f"{STATE_DB_PATH.as_uri()}?mode=ro"
+    try:
+        con = sqlite3.connect(uri, uri=True)
+    except sqlite3.Error:
+        # e.g. db missing, or WAL side-files not creatable in read-only mode
+        return []
     try:
         con.row_factory = sqlite3.Row
         rows = con.execute(
@@ -40,5 +58,7 @@ def list_sessions(limit: int = 50) -> list[dict]:
             (limit,),
         ).fetchall()
         return [dict(row) for row in rows]
+    except sqlite3.Error:
+        return []
     finally:
         con.close()

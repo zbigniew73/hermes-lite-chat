@@ -20,6 +20,17 @@ from pathlib import Path
 
 HERMES_BIN = os.environ.get("HERMES_BIN") or shutil.which("hermes") or "hermes"
 
+# This app's own login secrets have no business being visible to the agent
+# process (or to anything the agent shells out to).
+_STRIPPED_ENV_VARS = ("ADMIN_USERNAME", "ADMIN_PASSWORD", "HERMES_LITE_AUTH_STORE")
+
+
+def child_env() -> dict[str, str]:
+    env = os.environ.copy()
+    for name in _STRIPPED_ENV_VARS:
+        env.pop(name, None)
+    return env
+
 
 def spawn_hermes_pty(session_id: str | None) -> tuple[subprocess.Popen, int]:
     master_fd, slave_fd = pty.openpty()
@@ -27,15 +38,26 @@ def spawn_hermes_pty(session_id: str | None) -> tuple[subprocess.Popen, int]:
     if session_id:
         cmd += ["--resume", session_id]
 
-    proc = subprocess.Popen(
-        cmd,
-        stdin=slave_fd,
-        stdout=slave_fd,
-        stderr=slave_fd,
-        preexec_fn=os.setsid,
-        cwd=str(Path.home()),
-        env=os.environ.copy(),
-    )
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            # start_new_session does the setsid() in the C-level child helper;
+            # preexec_fn runs Python after fork(), which is unsafe in a
+            # threaded server (uvicorn's executor).
+            start_new_session=True,
+            cwd=str(Path.home()),
+            env=child_env(),
+        )
+    except BaseException:
+        for fd in (slave_fd, master_fd):
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        raise
     os.close(slave_fd)
     return proc, master_fd
 

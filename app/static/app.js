@@ -25,18 +25,31 @@ function formatTimestamp(epochSeconds) {
 }
 
 async function loadSessions() {
-  const res = await fetch("/api/hermes/sessions");
-  const sessions = await res.json();
-  sessionListEl.innerHTML = "";
+  let sessions;
+  try {
+    const res = await fetch("/api/hermes/sessions");
+    if (!res.ok) return;
+    sessions = await res.json();
+  } catch {
+    return;
+  }
+  sessionListEl.replaceChildren();
   for (const s of sessions) {
     const item = document.createElement("div");
     item.className = "session-item";
     item.dataset.sessionId = s.id;
-    const title = s.title || s.display_name || s.id;
-    item.innerHTML = `
-      <div class="title">${title}</div>
-      <div class="meta">${s.source} · ${s.message_count ?? 0} msgs · ${formatTimestamp(s.started_at)}</div>
-    `;
+
+    // textContent, never innerHTML: these strings come straight out of the
+    // agent's DB and may contain markup from anything the agent ingested.
+    const titleEl = document.createElement("div");
+    titleEl.className = "title";
+    titleEl.textContent = s.title || s.display_name || s.id;
+
+    const metaEl = document.createElement("div");
+    metaEl.className = "meta";
+    metaEl.textContent = `${s.source ?? ""} · ${s.message_count ?? 0} msgs · ${formatTimestamp(s.started_at)}`;
+
+    item.append(titleEl, metaEl);
     item.addEventListener("click", () => openSession(s.id));
     sessionListEl.appendChild(item);
   }
@@ -57,6 +70,7 @@ function closeCurrentSession() {
     term.dispose();
     term = null;
   }
+  fitAddon = null;
 }
 
 function openSession(sessionId) {
@@ -71,55 +85,79 @@ function openTerminal(sessionId) {
   placeholderEl.style.display = "none";
   terminalEl.style.display = "block";
 
-  term = new Terminal({
+  // Captured per session: a late event from a socket/terminal pair that has
+  // already been replaced must never write into the *current* terminal.
+  const thisTerm = new Terminal({
     cursorBlink: true,
     fontSize: 14,
     fontFamily: "Menlo, Consolas, 'Courier New', monospace",
   });
-  fitAddon = new FitAddon.FitAddon();
-  term.loadAddon(fitAddon);
-  term.open(terminalEl);
-  fitAddon.fit();
+  const thisFitAddon = new FitAddon.FitAddon();
+  term = thisTerm;
+  fitAddon = thisFitAddon;
+  thisTerm.loadAddon(thisFitAddon);
+  thisTerm.open(terminalEl);
+  thisFitAddon.fit();
 
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   let wsUrl = `${proto}//${location.host}/ws/pty`;
   if (sessionId) {
     wsUrl += `?session_id=${encodeURIComponent(sessionId)}`;
   }
-  socket = new WebSocket(wsUrl);
-  socket.binaryType = "arraybuffer";
+  const thisSocket = new WebSocket(wsUrl);
+  socket = thisSocket;
+  thisSocket.binaryType = "arraybuffer";
 
-  socket.addEventListener("open", () => {
-    sendResize();
+  thisSocket.addEventListener("open", () => {
+    sendResize(thisTerm, thisSocket);
   });
 
-  socket.addEventListener("message", (event) => {
-    term.write(new Uint8Array(event.data));
+  thisSocket.addEventListener("message", (event) => {
+    if (thisTerm !== term) return;
+    thisTerm.write(new Uint8Array(event.data));
   });
 
-  socket.addEventListener("close", () => {
-    term.write("\r\n\x1b[2m[session ended]\x1b[0m\r\n");
+  thisSocket.addEventListener("close", () => {
+    if (thisTerm === term) {
+      thisTerm.write("\r\n\x1b[2m[session ended]\x1b[0m\r\n");
+    }
+    // The session the child just finished is now persisted; refresh the list.
+    loadSessions();
   });
 
-  term.onData((data) => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(new TextEncoder().encode(data));
+  thisTerm.onData((data) => {
+    if (thisSocket.readyState === WebSocket.OPEN) {
+      thisSocket.send(new TextEncoder().encode(data));
     }
   });
 
-  term.onResize(() => sendResize());
-
-  new ResizeObserver(() => {
-    if (fitAddon) fitAddon.fit();
-  }).observe(terminalEl);
+  thisTerm.onResize(() => sendResize(thisTerm, thisSocket));
 }
 
-function sendResize() {
-  if (!term || !socket || socket.readyState !== WebSocket.OPEN) return;
-  socket.send(JSON.stringify({ type: "resize", rows: term.rows, cols: term.cols }));
+function sendResize(targetTerm = term, targetSocket = socket) {
+  if (!targetTerm || !targetSocket || targetSocket.readyState !== WebSocket.OPEN) return;
+  targetSocket.send(
+    JSON.stringify({ type: "resize", rows: targetTerm.rows, cols: targetTerm.cols })
+  );
 }
 
-newChatBtn.addEventListener("click", () => openTerminal(null));
+// One observer for the life of the tab, always fitting whatever addon is
+// current — creating one per session leaked an observer per session switch.
+new ResizeObserver(() => {
+  if (!term || !fitAddon) return;
+  try {
+    fitAddon.fit();
+  } catch {
+    /* terminal disposed mid-resize */
+  }
+}).observe(terminalEl);
+
+newChatBtn.addEventListener("click", () => {
+  openTerminal(null);
+  // Sidebar would otherwise stay stale until a full reload. (The brand-new
+  // session isn't persisted yet, so it won't show up until it is.)
+  loadSessions();
+});
 
 const changePasswordBtn = document.getElementById("change-password-btn");
 const changePasswordForm = document.getElementById("change-password-form");
