@@ -3,7 +3,9 @@ import contextlib
 import json
 import logging
 import os
+import re
 import shutil
+import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -27,6 +29,19 @@ OUTPUT_QUEUE_MAXSIZE = 64
 # Terminal geometry bounds — anything outside is garbage, not a resize.
 MIN_ROWS = MIN_COLS = 1
 MAX_ROWS = MAX_COLS = 500
+
+# Hermes Agent session ids look like "20260719_072205_1e0023". Anything outside
+# this shape never reaches the `hermes` argv list. Two properties matter:
+# the first character must be alphanumeric, so argparse can never mistake the
+# id for an option, and the whole thing must be short and free of separators.
+# (The exec itself is already a plain argv list with no shell, so this is
+# defence in depth rather than the only thing standing between us and injection.)
+SESSION_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
+# `hermes sessions delete` is a local sqlite delete; it has no business taking
+# this long, and a hung child must not pin a threadpool worker forever.
+HERMES_CLI_TIMEOUT_SECONDS = 30
+# Upper bound on how much child stderr is echoed back to the browser.
+MAX_CLI_ERROR_CHARS = 300
 
 
 def _startup_checks() -> None:
@@ -109,6 +124,30 @@ async def change_password(req: ChangePasswordRequest):
     return {"ok": True}
 
 
+@app.post("/api/auth/logout")
+async def logout():
+    """Target for the browser-side Basic Auth logout trick — see app.js.
+
+    There is no server-side session to destroy: this app is pure HTTP Basic
+    Auth, so "logged in" is a fact about the *browser's* credential cache, not
+    about any state we hold. The only thing that dislodges that cache is a 401
+    for the realm, which the auth middleware already produces for any request
+    carrying bad credentials.
+
+    So this handler intentionally does nothing. Its whole job is to be a
+    stable, side-effect-free URL behind the auth gate that the frontend can
+    deliberately hit with a *wrong* Authorization header to provoke that 401.
+    Reached with good credentials (the middleware let it through) it just
+    confirms the endpoint exists.
+
+    Note it deliberately does NOT clear auth_store's verified-credential
+    cache: that cache is a scrypt shortcut keyed by credential pair, not a
+    session table, and flushing it would only make the next request slower
+    for every client without logging anyone out.
+    """
+    return {"ok": True}
+
+
 @app.get("/api/hermes/model")
 async def get_model():
     return hermes_data.get_current_model()
@@ -117,6 +156,81 @@ async def get_model():
 @app.get("/api/hermes/sessions")
 async def get_sessions(limit: int = Query(50, ge=1, le=500)):
     return hermes_data.list_sessions(limit=limit)
+
+
+def _run_hermes(*args: str) -> subprocess.CompletedProcess:
+    """Run the same `hermes` binary the PTY bridge spawns, non-interactively.
+
+    Argument *list*, never a shell string (no shell=True anywhere), so nothing
+    in the arguments can be interpreted as shell syntax. stdin is /dev/null so
+    a CLI that unexpectedly decides to prompt fails fast instead of hanging.
+    """
+    return subprocess.run(
+        [pty_bridge.HERMES_BIN, *args],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=HERMES_CLI_TIMEOUT_SECONDS,
+        cwd=str(Path.home()),
+        env=pty_bridge.child_env(),
+    )
+
+
+def _cli_error_detail(proc: subprocess.CompletedProcess, fallback: str) -> str:
+    """Last meaningful line the CLI printed, trimmed to something showable."""
+    for stream in (proc.stderr, proc.stdout):
+        lines = [line.strip() for line in (stream or "").splitlines() if line.strip()]
+        if lines:
+            return lines[-1][:MAX_CLI_ERROR_CHARS]
+    return fallback
+
+
+@app.delete("/api/hermes/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a Hermes Agent session by shelling out to the real CLI.
+
+    Deliberately not a `DELETE FROM sessions` against state.db: this app only
+    ever *reads* Hermes Agent's own files (see hermes_data), and every
+    mutation goes through the CLI that owns them, so related rows, indexes and
+    any future bookkeeping stay consistent.
+    """
+    if not SESSION_ID_RE.fullmatch(session_id):
+        raise HTTPException(status_code=400, detail="Invalid session id")
+
+    loop = asyncio.get_running_loop()
+    try:
+        proc = await loop.run_in_executor(
+            None, _run_hermes, "sessions", "delete", "--yes", session_id
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=500,
+            detail=f"hermes CLI not found ('{pty_bridge.HERMES_BIN}').",
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(
+            status_code=504,
+            detail=f"hermes sessions delete timed out after {HERMES_CLI_TIMEOUT_SECONDS}s.",
+        )
+    except OSError as exc:
+        logger.warning("hermes sessions delete failed to start: %r", exc)
+        raise HTTPException(status_code=500, detail="Could not run the hermes CLI.")
+
+    if proc.returncode != 0:
+        logger.info(
+            "hermes sessions delete %s exited %s: %s",
+            session_id,
+            proc.returncode,
+            (proc.stderr or proc.stdout or "").strip()[:500],
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=_cli_error_detail(
+                proc, f"hermes sessions delete exited {proc.returncode}."
+            ),
+        )
+
+    return {"ok": True, "id": session_id}
 
 
 @app.websocket("/ws/pty")

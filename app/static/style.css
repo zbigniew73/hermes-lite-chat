@@ -21,6 +21,36 @@
   }
 }
 
+/* Explicit theme override (set by the sidebar sun/moon toggle, persisted in
+   localStorage). A media query adds no specificity, so `:root[data-theme=...]`
+   (0,2,0) outranks the `:root` (0,1,0) inside the block above regardless of
+   the OS preference. When no choice has ever been made the attribute is
+   absent entirely and prefers-color-scheme stays in charge, which is the
+   default. `color-scheme` is re-declared so native widgets — scrollbars,
+   form controls, the canvas behind the page — follow the forced theme too
+   instead of the OS one. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --hover: #f3f4f6;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #16171a;
+  --fg: #e6e6e6;
+  --muted: #9aa0a6;
+  --border: #2a2b2f;
+  --accent: #3b82f6;
+  --accent-fg: #ffffff;
+  --hover: #232427;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -55,10 +85,40 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
 #sidebar h1 {
   font-size: 1rem;
-  margin: 0 0 0.4rem;
+  margin: 0;
   font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+
+#theme-toggle {
+  flex-shrink: 0;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--fg);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#theme-toggle:hover {
+  background: var(--hover);
 }
 
 #model-info {
@@ -89,6 +149,55 @@ body {
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* min-width:0 so the long title inside can actually ellipsis instead of
+   forcing the flex row wider than the sidebar. */
+.session-item .session-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-delete {
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.session-item:hover .session-delete,
+.session-delete:focus-visible {
+  opacity: 1;
+}
+
+.session-delete:hover {
+  border-color: var(--border);
+  background: var(--bg);
+  color: #dc2626;
+}
+
+.session-delete[disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Touch devices never hover, so reveal-on-hover would hide it permanently. */
+@media (hover: none) {
+  .session-delete {
+    opacity: 1;
+  }
 }
 
 .session-item:hover {
@@ -125,14 +234,25 @@ body {
   cursor: pointer;
 }
 
-#change-password-btn {
-  width: 100%;
+.account-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+#change-password-btn,
+#logout-btn {
+  flex: 1;
   padding: 0.4rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   background: transparent;
   color: var(--fg);
   font-size: 0.8rem;
+}
+
+#logout-btn:hover,
+#change-password-btn:hover {
+  background: var(--hover);
 }
 
 #change-password-form {
@@ -205,4 +325,52 @@ body {
 #terminal {
   height: 100%;
   width: 100%;
+}
+
+/* Covers the whole app after logout. The page itself was loaded *before* the
+   credential cache was invalidated and its JS keeps running happily, so
+   without something opaque on top there would be no visible difference
+   between "logged out" and "still logged in". */
+#logged-out {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+#logged-out[hidden] {
+  display: none;
+}
+
+#logged-out h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+#logged-out p {
+  margin: 0;
+  max-width: 30rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+#logged-out button {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.5rem;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
 }
