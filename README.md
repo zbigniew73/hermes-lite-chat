@@ -1,4 +1,6 @@
-# hermes-lite-chat
+# Hermes Lite Chat
+
+![Hermes Lite Chat screenshot](hermes-lite-chat.png)
 
 A web terminal for your local [Hermes Agent](https://hermes-agent.nousresearch.com/) install (`~/.hermes`). It spawns the real `hermes chat --cli` in a PTY and streams it into an `xterm.js` terminal in the browser — not a reimplementation, the literal same CLI program — so tool use, approval prompts, and streaming all behave exactly as they do in a real terminal. The sidebar lists your existing Hermes sessions (read-only, straight from `~/.hermes/state.db`) so you can pick one to resume, or start a new chat.
 
@@ -91,7 +93,7 @@ systemctl --user daemon-reload
 
 ---
 
-# hermes-lite-chat (wersja polska)
+# Hermes Lite Chat (wersja polska)
 
 Terminal webowy dla lokalnej instalacji [Hermes Agent](https://hermes-agent.nousresearch.com/) (`~/.hermes`). Uruchamia prawdziwe `hermes chat --cli` w PTY i strumieniuje je do terminala `xterm.js` w przeglądarce — to nie jest reimplementacja, tylko dosłownie ten sam program CLI — dzięki czemu korzystanie z narzędzi, prompty zatwierdzania i strumieniowanie zachowują się dokładnie tak samo jak w prawdziwym terminalu. Pasek boczny wyświetla listę istniejących sesji Hermesa (tylko do odczytu, bezpośrednio z `~/.hermes/state.db`), dzięki czemu można wznowić dowolną z nich albo rozpocząć nową rozmowę.
 
