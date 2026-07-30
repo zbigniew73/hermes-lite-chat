@@ -315,7 +315,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 150px;
+  height: 50px;
   padding: 0.5rem 1rem;
   flex-shrink: 0;
 }
@@ -341,17 +341,13 @@ body {
 
 #settings-btn {
   padding: 0.35rem 0.75rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent);
   border-radius: 0.5rem;
-  background: transparent;
-  color: var(--fg);
+  background: var(--accent);
+  color: var(--accent-fg);
   font: inherit;
   font-size: 0.8rem;
   cursor: pointer;
-}
-
-#settings-btn:hover {
-  background: var(--hover);
 }
 
 #settings-panel {

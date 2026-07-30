@@ -221,7 +221,7 @@ function openTerminal(sessionId) {
   // already been replaced must never write into the *current* terminal.
   const thisTerm = new Terminal({
     cursorBlink: true,
-    fontSize: 16,
+    fontSize: 22,
     fontFamily: "Menlo, Consolas, 'Courier New', monospace",
   });
   const thisFitAddon = new FitAddon.FitAddon();
