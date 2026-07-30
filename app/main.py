@@ -1,3 +1,13 @@
+# =============================================================================
+# hermes-lite-chat
+# =============================================================================
+# Strona   : automation-ai.eu - Automatyzacja AI
+# Autor    : Zbigniew Czechowski
+# WWW      : https://automation-ai.eu/
+# E-mail   : kontakt@automation-ai.eu
+# Licencja : MIT - bezpłatna dla wszystkich
+# =============================================================================
+
 import asyncio
 import contextlib
 import json

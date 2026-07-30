@@ -1,3 +1,13 @@
+# =============================================================================
+# hermes-lite-chat
+# =============================================================================
+# Strona   : automation-ai.eu - Automatyzacja AI
+# Autor    : Zbigniew Czechowski
+# WWW      : https://automation-ai.eu/
+# E-mail   : kontakt@automation-ai.eu
+# Licencja : MIT - bezpłatna dla wszystkich
+# =============================================================================
+
 """Spawn the real `hermes chat --cli` in a PTY and bridge it to a WebSocket.
 
 Deliberately not a re-implementation of Hermes Agent's chat behavior: this

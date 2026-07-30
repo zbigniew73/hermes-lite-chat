@@ -1,3 +1,13 @@
+# =============================================================================
+# hermes-lite-chat
+# =============================================================================
+# Strona   : automation-ai.eu - Automatyzacja AI
+# Autor    : Zbigniew Czechowski
+# WWW      : https://automation-ai.eu/
+# E-mail   : kontakt@automation-ai.eu
+# Licencja : MIT - bezpłatna dla wszystkich
+# =============================================================================
+
 """HTTP Basic Auth gate covering HTTP routes, static files, and the /ws/pty
 WebSocket handshake alike (a plain @app.middleware("http") would miss the
 WebSocket scope entirely, so this is a raw ASGI middleware instead).

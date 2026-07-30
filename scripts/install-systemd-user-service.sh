@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+# =============================================================================
+# hermes-lite-chat
+# =============================================================================
+# Strona   : automation-ai.eu - Automatyzacja AI
+# Autor    : Zbigniew Czechowski
+# WWW      : https://automation-ai.eu/
+# E-mail   : kontakt@automation-ai.eu
+# Licencja : MIT - bezpłatna dla wszystkich
+# =============================================================================
+#
 # Installs hermes-lite-chat as a systemd --user service, so it starts
 # automatically at boot and keeps running after logout (see the README
 # section "Autostart on boot" / "Autostart przy starcie systemu").

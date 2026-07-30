@@ -1,3 +1,13 @@
+/* =============================================================================
+ * hermes-lite-chat
+ * =============================================================================
+ * Strona   : automation-ai.eu - Automatyzacja AI
+ * Autor    : Zbigniew Czechowski
+ * WWW      : https://automation-ai.eu/
+ * E-mail   : kontakt@automation-ai.eu
+ * Licencja : MIT - bezpłatna dla wszystkich
+ * ========================================================================== */
+
 // --- theme ------------------------------------------------------------------
 // The stored preference is already applied by the inline <head> script (to
 // avoid a flash of the wrong theme); everything here only keeps the toggle

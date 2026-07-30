@@ -1,3 +1,13 @@
+# =============================================================================
+# hermes-lite-chat
+# =============================================================================
+# Strona   : automation-ai.eu - Automatyzacja AI
+# Autor    : Zbigniew Czechowski
+# WWW      : https://automation-ai.eu/
+# E-mail   : kontakt@automation-ai.eu
+# Licencja : MIT - bezpłatna dla wszystkich
+# =============================================================================
+
 """hermes-lite-chat's own login store (separate from Hermes Agent's auth).
 
 Stored outside the repo tree so it never gets committed, hashed (scrypt,

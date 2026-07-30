@@ -1,6 +1,20 @@
+<!--
+  =============================================================================
+  hermes-lite-chat
+  =============================================================================
+  Strona   : automation-ai.eu - Automatyzacja AI
+  Autor    : Zbigniew Czechowski
+  WWW      : https://automation-ai.eu/
+  E-mail   : kontakt@automation-ai.eu
+  Licencja : MIT - bezpłatna dla wszystkich
+  =============================================================================
+-->
+
 # Hermes Lite Chat
 
 ![Hermes Lite Chat screenshot](hermes-lite-chat.png)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A web terminal for your local [Hermes Agent](https://hermes-agent.nousresearch.com/) install (`~/.hermes`). It spawns the real `hermes chat --cli` in a PTY and streams it into an `xterm.js` terminal in the browser — not a reimplementation, the literal same CLI program — so tool use, approval prompts, and streaming all behave exactly as they do in a real terminal. The sidebar lists your existing Hermes sessions (read-only, straight from `~/.hermes/state.db`) so you can pick one to resume, or start a new chat.
 
@@ -90,6 +104,12 @@ systemctl --user disable --now hermes-lite-chat
 rm ~/.config/systemd/user/hermes-lite-chat.service
 systemctl --user daemon-reload
 ```
+
+## License
+
+MIT - free for everyone, see [LICENSE](LICENSE).
+
+Made by [Zbigniew Czechowski](https://automation-ai.eu/) ([automation-ai.eu](https://automation-ai.eu/) - kontakt@automation-ai.eu).
 
 ---
 
@@ -183,3 +203,9 @@ systemctl --user disable --now hermes-lite-chat
 rm ~/.config/systemd/user/hermes-lite-chat.service
 systemctl --user daemon-reload
 ```
+
+## Licencja
+
+MIT - bezpłatna dla wszystkich, zobacz [LICENSE](LICENSE).
+
+Autor: [Zbigniew Czechowski](https://automation-ai.eu/) ([automation-ai.eu](https://automation-ai.eu/) - kontakt@automation-ai.eu).
