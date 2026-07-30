@@ -63,6 +63,11 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Two tabs resuming the *same* session concurrently behave like two terminals attached to the same `--resume` id — governed by Hermes Agent's own active-session logic, not this app.
 - `/api/hermes/model` and `/api/hermes/sessions` are read-only lookups (YAML/SQLite); this app never writes to Hermes Agent's config or session database directly.
 
+## Security recommendations
+
+- **Recommended: run this locally, or on a local network you trust, only** (`HOST=127.0.0.1`, or `0.0.0.0` on a trusted LAN). Anyone who logs in gets the same tool/shell/browser access as a real terminal session — treat exposing this app like exposing a terminal, not a website.
+- If you do expose it to the public internet anyway, at minimum: put it behind HTTPS (a reverse proxy with a real TLS certificate — plain HTTP Basic Auth sends credentials in an easily-decoded form, not encrypted, over plain HTTP), change the default password immediately, and restrict access further (VPN, IP allowlist, or a firewall rule) instead of leaving the port open to everyone.
+
 ## Autostart on boot (systemd user service)
 
 By default the app only runs while you keep the terminal command open. To have it start automatically at boot and keep running after you log out, run it as a `systemd --user` service — no root/sudo needed for the app itself.
@@ -155,6 +160,11 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Zamknięcie karty przeglądarki kończy proces `hermes chat` powiązany z daną sesją PTY (to nie jest "pauza" — wznowienie tej samej sesji później kontynuuje od tego, co zdążyło się zapisać do `state.db`).
 - Dwie karty wznawiające jednocześnie **tę samą** sesję zachowują się jak dwa terminale podłączone pod to samo `--resume` id — reguluje to własna logika aktywnej sesji Hermes Agent, a nie ta aplikacja.
 - `/api/hermes/model` i `/api/hermes/sessions` to zapytania wyłącznie do odczytu (YAML/SQLite); ta aplikacja nigdy nie zapisuje bezpośrednio do konfiguracji ani bazy sesji Hermes Agent.
+
+## Zalecenia bezpieczeństwa
+
+- **Zalecane: używaj tej aplikacji tylko lokalnie albo w zaufanej sieci lokalnej** (`HOST=127.0.0.1`, albo `0.0.0.0` w zaufanej sieci LAN). Każdy, kto się zaloguje, ma taki sam dostęp do narzędzi, powłoki i przeglądarki jak w prawdziwej sesji terminalowej — traktuj wystawienie tej aplikacji jak wystawienie terminala, a nie strony internetowej.
+- Jeśli mimo to wystawiasz ją do internetu, zadbaj przynajmniej o: HTTPS (reverse proxy z prawdziwym certyfikatem TLS — zwykłe HTTP Basic Auth przesyła dane logowania w formie łatwej do zdekodowania, nieszyfrowanej po zwykłym HTTP), natychmiastową zmianę domyślnego hasła oraz dodatkowe ograniczenie dostępu (VPN, lista dozwolonych adresów IP albo reguła zapory) zamiast zostawiania otwartego portu dla wszystkich.
 
 ## Autostart przy starcie systemu (usługa systemd --user)
 
