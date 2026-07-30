@@ -20,7 +20,12 @@ nor plain CSRF via a cross-origin form POST.
 
 Also throttles repeated failed credential guesses per client IP (see
 auth_store.is_locked_out) — scrypt's cost alone only slows a single-threaded
-guesser, not one spreading attempts across concurrent connections.
+guesser, not one spreading attempts across concurrent connections. The
+lockout check is skipped entirely for a credential pair that's already in the
+short-lived verify cache, so an active, already-authenticated session is
+never blocked by unrelated noise against the same IP (e.g. behind a reverse
+proxy, or an attacker sharing a NAT with the real admin) — only requests that
+still need a fresh scrypt check are gated.
 """
 
 import asyncio
@@ -52,45 +57,66 @@ class BasicAuthMiddleware:
             scope["type"] == "http" and scope["method"] not in _SAFE_METHODS
         )
         if needs_same_origin and not self._is_same_origin(scope):
-            if scope["type"] == "http":
-                response = PlainTextResponse("Cross-origin request rejected", status_code=403)
-                await response(scope, receive, send)
-            else:
-                await send({"type": "websocket.close", "code": 1008})
+            await self._deny(scope, receive, send, 403, "Cross-origin request rejected")
             return
+
+        creds = self._decode_credentials(scope)
+        credentials_sent = creds is not None
+        # /api/auth/logout deliberately sends bogus credentials to provoke the
+        # 401 that evicts the browser's cached ones (see the logout() doc
+        # comment in app.js) — that is its entire mechanism, not a real login
+        # guess, so it must never feed the brute-force counter or be blocked
+        # by it (that would silently break logout instead of a real attack).
+        is_logout_probe = scope["type"] == "http" and scope.get("path") == "/api/auth/logout"
+
+        cached_ok = credentials_sent and auth_store.cached_verify(*creds)
 
         client_host = self._client_host(scope)
-        if auth_store.is_locked_out(client_host):
-            if scope["type"] == "http":
-                response = PlainTextResponse(
-                    "Too many failed attempts, try again shortly", status_code=429
-                )
-                await response(scope, receive, send)
-            else:
-                await send({"type": "websocket.close", "code": 1008})
+        if not cached_ok and not is_logout_probe and auth_store.is_locked_out(client_host):
+            await self._deny(scope, receive, send, 429, "Too many failed attempts, try again shortly")
             return
 
-        headers = dict(scope.get("headers") or [])
-        credentials_sent = headers.get(b"authorization", b"").startswith(b"Basic ")
+        if credentials_sent and not cached_ok and not is_logout_probe:
+            # About to pay for a real scrypt check (or this is a doomed
+            # guess) — count it now, before the executor hop below, so a
+            # burst of concurrent attempts can't all start before any one of
+            # them finishes and gets counted (see auth_store.record_attempt).
+            auth_store.record_attempt(client_host)
 
-        if await self._is_authorized(scope):
+        authorized = cached_ok
+        if credentials_sent and not cached_ok:
+            username, password = creds
+            loop = asyncio.get_running_loop()
+            authorized = await loop.run_in_executor(None, auth_store.verify, username, password)
+            if authorized:
+                auth_store.remember_verified(username, password)
+
+        if authorized:
             if credentials_sent:
                 auth_store.record_success(client_host)
             await self.app(scope, receive, send)
             return
 
-        # Only count it as a brute-force attempt if credentials were actually
-        # guessed — the first, credential-less request every browser sends to
-        # trigger the login prompt is not an attack.
-        if credentials_sent:
-            auth_store.record_failure(client_host)
+        await self._deny(
+            scope,
+            receive,
+            send,
+            401,
+            "Unauthorized",
+            headers={"WWW-Authenticate": f'Basic realm="{REALM}"'},
+        )
 
+    @staticmethod
+    async def _deny(
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+        status_code: int,
+        detail: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         if scope["type"] == "http":
-            response = PlainTextResponse(
-                "Unauthorized",
-                status_code=401,
-                headers={"WWW-Authenticate": f'Basic realm="{REALM}"'},
-            )
+            response = PlainTextResponse(detail, status_code=status_code, headers=headers)
             await response(scope, receive, send)
         else:
             await send({"type": "websocket.close", "code": 1008})
@@ -99,6 +125,21 @@ class BasicAuthMiddleware:
     def _client_host(scope: Scope) -> str:
         client = scope.get("client")
         return client[0] if client else "unknown"
+
+    @staticmethod
+    def _decode_credentials(scope: Scope) -> tuple[str, str] | None:
+        headers = dict(scope.get("headers") or [])
+        raw = headers.get(b"authorization", b"")
+        if not raw.startswith(b"Basic "):
+            return None
+        try:
+            decoded = base64.b64decode(raw[6:]).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return None
+        username, sep, password = decoded.partition(":")
+        if not sep:
+            return None
+        return username, password
 
     @staticmethod
     def _is_same_origin(scope: Scope) -> bool:
@@ -133,28 +174,3 @@ class BasicAuthMiddleware:
         if default_port and ":" not in host_authority:
             host_authority = f"{host_authority}:{default_port}"
         return origin_authority.lower() == host_authority.lower()
-
-    @staticmethod
-    async def _is_authorized(scope: Scope) -> bool:
-        headers = dict(scope.get("headers") or [])
-        raw = headers.get(b"authorization", b"")
-        if not raw.startswith(b"Basic "):
-            return False
-        try:
-            decoded = base64.b64decode(raw[6:]).decode("utf-8")
-        except (ValueError, UnicodeDecodeError):
-            return False
-        username, sep, password = decoded.partition(":")
-        if not sep:
-            return False
-
-        # Cheap path: these exact credentials verified moments ago.
-        if auth_store.cached_verify(username, password):
-            return True
-
-        # scrypt takes ~100ms; keep it off the event loop.
-        loop = asyncio.get_running_loop()
-        ok = await loop.run_in_executor(None, auth_store.verify, username, password)
-        if ok:
-            auth_store.remember_verified(username, password)
-        return ok

@@ -39,8 +39,13 @@ OUTPUT_QUEUE_MAXSIZE = 64
 # Max unflushed bytes buffered in the browser->PTY direction. Unlike the queue
 # above, a slow/stuck PTY here has no backpressure signal to push back on the
 # browser with, so past this cap the session is torn down instead of letting
-# `pending_write` grow without bound.
-MAX_PENDING_WRITE_BYTES = 1_000_000
+# `pending_write` grow without bound. A raw PTY master only accepts on the
+# order of ~12KB per write when nothing is draining it, so a single large
+# paste (xterm.js delivers a paste as one WebSocket message) can legitimately
+# need most of this buffer before the shell on the other end catches up —
+# kept generously above uvicorn's 16MB default WS message size so no normal
+# paste trips it, while still bounding worst-case per-session memory.
+MAX_PENDING_WRITE_BYTES = 32_000_000
 # Terminal geometry bounds — anything outside is garbage, not a resize.
 MIN_ROWS = MIN_COLS = 1
 MAX_ROWS = MAX_COLS = 500
@@ -444,8 +449,14 @@ async def ws_pty(websocket: WebSocket, session_id: str | None = None):
 
 
 async def _stop_pump(queue: asyncio.Queue, task: asyncio.Task) -> None:
-    """Let the output pump flush what's queued, then stop it."""
-    await queue.put(None)
+    """Let the output pump flush what's queued, then stop it.
+
+    If the pump already exited on its own (e.g. websocket.send_bytes failed),
+    nothing will ever consume the queue — putting into it would block for the
+    full outer timeout instead of returning immediately.
+    """
+    if not task.done():
+        await queue.put(None)
     await task
 
 

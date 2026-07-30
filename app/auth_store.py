@@ -16,6 +16,7 @@ store the first time it doesn't exist yet, so a password changed via the UI
 survives app restarts instead of being reset back to the .env default.
 """
 
+import contextlib
 import hashlib
 import json
 import os
@@ -89,7 +90,7 @@ def clear_verify_cache() -> None:
 
 
 # --- brute-force throttling --------------------------------------------------
-# Per-client-IP failure tracking, in memory only (resets on restart, same as
+# Per-client-IP attempt tracking, in memory only (resets on restart, same as
 # the verification cache above). This is a last-resort backstop against a
 # single naive brute-force loop hammering this process directly — it is not a
 # substitute for network-level protections when this app sits behind a
@@ -115,10 +116,23 @@ def is_locked_out(client_host: str) -> bool:
     return len(times) >= _FAILURE_THRESHOLD
 
 
-def record_failure(client_host: str) -> None:
+def record_attempt(client_host: str) -> None:
+    """Note that a credential check is about to happen, before it happens.
+
+    Called synchronously, before the (slow, executor-hopping) real scrypt
+    check — recording after the fact would let a burst of concurrent guesses
+    all start before any single one finishes and gets counted, sailing past
+    the threshold. A successful check clears the bucket via record_success,
+    so an optimistic pre-recorded attempt that turns out to be a real login
+    never lingers as a false failure.
+    """
     now = time.monotonic()
     if client_host not in _failures and len(_failures) >= _MAX_TRACKED_CLIENTS:
-        _failures.clear()
+        # Evict the single stalest entry rather than clearing everyone, so an
+        # attacker can't wipe their own lockout on demand just by cycling
+        # through enough distinct source addresses to fill the table.
+        oldest_key = min(_failures, key=lambda k: _failures[k][-1] if _failures[k] else 0.0)
+        _failures.pop(oldest_key, None)
     times = _failures.setdefault(client_host, [])
     times.append(now)
     _prune(times, now)
@@ -138,13 +152,32 @@ def _hash_password(password: str, salt: bytes) -> bytes:
 
 
 def _write(username: str, password: str) -> None:
+    """Write the store atomically, 0600 from the moment the file exists.
+
+    write_text() + chmod() would leave the file at the process umask
+    (typically world-readable) for the window in between, and a crash or full
+    disk mid-write would leave a truncated file that verify() can never read
+    again — locking out the admin permanently, since ensure_bootstrap refuses
+    to re-seed a path that already exists. A temp file created with the right
+    mode up front, then renamed into place, has neither problem: the rename
+    is atomic, so readers only ever see a complete file or none at all.
+    """
     salt = secrets.token_bytes(16)
     digest = _hash_password(password, salt)
     STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    STORE_PATH.write_text(
-        json.dumps({"username": username, "salt": salt.hex(), "hash": digest.hex()})
-    )
-    STORE_PATH.chmod(0o600)
+    payload = json.dumps({"username": username, "salt": salt.hex(), "hash": digest.hex()})
+    tmp_path = STORE_PATH.with_name(f".{STORE_PATH.name}.tmp-{os.getpid()}")
+    fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(payload)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, STORE_PATH)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(tmp_path)
+        raise
 
 
 def ensure_bootstrap(default_username: str, default_password: str) -> bool:

@@ -50,7 +50,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-ExecStart=$VENV_PYTHON -m app.main
+ExecStart="$VENV_PYTHON" -m app.main
 WorkingDirectory=$REPO_DIR
 Environment="PATH=$REPO_DIR/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$HOME/.local/bin"
 Restart=always

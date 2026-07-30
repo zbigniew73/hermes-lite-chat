@@ -67,6 +67,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 - **Recommended: run this locally, or on a local network you trust, only** (`HOST=127.0.0.1`, or `0.0.0.0` on a trusted LAN). Anyone who logs in gets the same tool/shell/browser access as a real terminal session — treat exposing this app like exposing a terminal, not a website.
 - If you do expose it to the public internet anyway, at minimum: put it behind HTTPS (a reverse proxy with a real TLS certificate — plain HTTP Basic Auth sends credentials in an easily-decoded form, not encrypted, over plain HTTP), change the default password immediately, and restrict access further (VPN, IP allowlist, or a firewall rule) instead of leaving the port open to everyone.
+- If you do put a reverse proxy in front of it, make sure it forwards the original `Host` header (e.g. nginx's `proxy_set_header Host $host`, not a hardcoded `127.0.0.1:8000`) — this app compares `Host` against `Origin` to block cross-site requests, and a rewritten `Host` will make every login and WebSocket connection fail that check.
 
 ## Autostart on boot (systemd user service)
 
@@ -165,6 +166,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 - **Zalecane: używaj tej aplikacji tylko lokalnie albo w zaufanej sieci lokalnej** (`HOST=127.0.0.1`, albo `0.0.0.0` w zaufanej sieci LAN). Każdy, kto się zaloguje, ma taki sam dostęp do narzędzi, powłoki i przeglądarki jak w prawdziwej sesji terminalowej — traktuj wystawienie tej aplikacji jak wystawienie terminala, a nie strony internetowej.
 - Jeśli mimo to wystawiasz ją do internetu, zadbaj przynajmniej o: HTTPS (reverse proxy z prawdziwym certyfikatem TLS — zwykłe HTTP Basic Auth przesyła dane logowania w formie łatwej do zdekodowania, nieszyfrowanej po zwykłym HTTP), natychmiastową zmianę domyślnego hasła oraz dodatkowe ograniczenie dostępu (VPN, lista dozwolonych adresów IP albo reguła zapory) zamiast zostawiania otwartego portu dla wszystkich.
+- Jeśli stawiasz przed aplikacją reverse proxy, upewnij się, że przekazuje oryginalny nagłówek `Host` (np. w nginx `proxy_set_header Host $host`, a nie na sztywno `127.0.0.1:8000`) — ta aplikacja porównuje `Host` z `Origin`, żeby blokować żądania cross-site, a nadpisany `Host` sprawi, że każde logowanie i połączenie WebSocket nie przejdzie tej weryfikacji.
 
 ## Autostart przy starcie systemu (usługa systemd --user)
 
