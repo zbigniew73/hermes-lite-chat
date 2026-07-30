@@ -174,3 +174,4 @@ class BasicAuthMiddleware:
         if default_port and ":" not in host_authority:
             host_authority = f"{host_authority}:{default_port}"
         return origin_authority.lower() == host_authority.lower()
+

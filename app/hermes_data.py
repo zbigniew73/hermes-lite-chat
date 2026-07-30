@@ -72,3 +72,4 @@ def list_sessions(limit: int = 50) -> list[dict]:
         return []
     finally:
         con.close()
+

@@ -127,3 +127,4 @@ def terminate(proc: subprocess.Popen, master_fd: int) -> None:
         os.close(master_fd)
     except OSError:
         pass
+

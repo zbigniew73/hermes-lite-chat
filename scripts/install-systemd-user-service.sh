@@ -80,3 +80,4 @@ Manage it with:
   systemctl --user restart ${SERVICE_NAME}
   journalctl --user -u ${SERVICE_NAME} -f
 EOF
+

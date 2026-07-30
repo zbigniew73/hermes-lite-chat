@@ -213,3 +213,4 @@ systemctl --user disable --now hermes-lite-chat
 rm ~/.config/systemd/user/hermes-lite-chat.service
 systemctl --user daemon-reload
 ```
+

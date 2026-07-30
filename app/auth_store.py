@@ -228,3 +228,4 @@ def change_password(current_password: str, new_password: str) -> bool:
     # Old credentials must stop working immediately, cache or no cache.
     clear_verify_cache()
     return True
+
