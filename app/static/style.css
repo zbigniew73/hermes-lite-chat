@@ -4,7 +4,7 @@
   --fg: #1a1a1a;
   --muted: #6b7280;
   --border: #e5e7eb;
-  --accent: #2563eb;
+  --accent: #16a34a;
   --accent-fg: #ffffff;
   --hover: #f3f4f6;
 }
@@ -15,14 +15,15 @@
     --fg: #e6e6e6;
     --muted: #9aa0a6;
     --border: #2a2b2f;
-    --accent: #3b82f6;
+    --accent: #22c55e;
     --accent-fg: #ffffff;
     --hover: #232427;
   }
 }
 
-/* Explicit theme override (set by the sidebar sun/moon toggle, persisted in
-   localStorage). A media query adds no specificity, so `:root[data-theme=...]`
+/* Explicit theme override (set by the sun/moon toggle in the settings
+   dropdown, persisted in localStorage). A media query adds no specificity,
+   so `:root[data-theme=...]`
    (0,2,0) outranks the `:root` (0,1,0) inside the block above regardless of
    the OS preference. When no choice has ever been made the attribute is
    absent entirely and prefers-color-scheme stays in charge, which is the
@@ -35,7 +36,7 @@
   --fg: #1a1a1a;
   --muted: #6b7280;
   --border: #e5e7eb;
-  --accent: #2563eb;
+  --accent: #16a34a;
   --accent-fg: #ffffff;
   --hover: #f3f4f6;
 }
@@ -46,7 +47,7 @@
   --fg: #e6e6e6;
   --muted: #9aa0a6;
   --border: #2a2b2f;
-  --accent: #3b82f6;
+  --accent: #22c55e;
   --accent-fg: #ffffff;
   --hover: #232427;
 }
@@ -85,19 +86,10 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
-}
-
 #sidebar h1 {
   font-size: 1rem;
-  margin: 0;
+  margin: 0 0 0.75rem;
   font-weight: 600;
-  flex: 1;
-  min-width: 0;
 }
 
 #theme-toggle {
@@ -124,7 +116,6 @@ body {
 #model-info {
   font-size: 0.8rem;
   color: var(--muted);
-  margin-bottom: 0.75rem;
   word-break: break-all;
 }
 
@@ -222,16 +213,16 @@ body {
   font-size: 0.75rem;
 }
 
-#account-box {
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-#change-password-btn,
-#account-box button {
+#settings-panel button {
   font: inherit;
   cursor: pointer;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
 }
 
 .account-actions {
@@ -260,6 +251,12 @@ body {
   flex-direction: column;
   gap: 0.4rem;
   margin-top: 0.5rem;
+}
+
+/* The `display: flex` above is an author declaration and would otherwise win
+   over the UA stylesheet's `[hidden] { display: none }`. */
+#change-password-form[hidden] {
+  display: none;
 }
 
 #change-password-form input {
@@ -308,9 +305,81 @@ body {
 
 #terminal-pane {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#top-bar,
+#bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  flex-shrink: 0;
+}
+
+#top-bar {
+  border-bottom: 1px solid var(--border);
+}
+
+#bottom-bar {
+  border-top: 1px solid var(--border);
+}
+
+#current-date {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* Anchor for the absolutely positioned dropdown below. */
+#settings {
+  position: relative;
+  flex-shrink: 0;
+}
+
+#settings-btn {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+#settings-btn:hover {
+  background: var(--hover);
+}
+
+#settings-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  /* The terminal canvas paints on its own layer; without this the panel would
+     end up behind it. */
+  z-index: 10;
+  width: 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#settings-panel[hidden] {
+  display: none;
+}
+
+#terminal-body {
+  flex: 1;
   position: relative;
   padding: 0.5rem;
-  min-width: 0;
+  min-height: 0;
 }
 
 #placeholder {

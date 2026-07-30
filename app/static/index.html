@@ -28,34 +28,45 @@
   <div id="app">
     <aside id="sidebar">
       <header>
-        <div class="title-row">
-          <h1>hermes-lite-chat</h1>
-          <!-- Label/icon are set by app.js to reflect the theme you'd switch TO. -->
-          <button id="theme-toggle" type="button" title="Switch theme" aria-label="Switch theme"></button>
-        </div>
-        <div id="model-info">loading model…</div>
+        <h1>hermes-lite-chat</h1>
         <button id="new-chat">+ New chat</button>
       </header>
       <div id="session-list"></div>
-      <footer id="account-box">
-        <div class="account-actions">
-          <button id="change-password-btn" type="button">Change password</button>
-          <button id="logout-btn" type="button">Log out</button>
-        </div>
-        <form id="change-password-form" hidden>
-          <input type="password" id="current-password" placeholder="Current password" autocomplete="current-password" required />
-          <input type="password" id="new-password" placeholder="New password" autocomplete="new-password" required />
-          <div class="form-actions">
-            <button type="submit">Save</button>
-            <button type="button" id="cancel-password-btn">Cancel</button>
-          </div>
-          <div id="change-password-msg"></div>
-        </form>
-      </footer>
     </aside>
     <main id="terminal-pane">
-      <div id="placeholder">Select a session or start a new chat.</div>
-      <div id="terminal"></div>
+      <div id="top-bar">
+        <div id="model-info">loading model…</div>
+        <div id="settings">
+          <button id="settings-btn" type="button" aria-haspopup="true" aria-expanded="false">Ustawienia</button>
+          <div id="settings-panel" hidden>
+            <div class="settings-row">
+              <span>Theme</span>
+              <!-- Label/icon are set by app.js to reflect the theme you'd switch TO. -->
+              <button id="theme-toggle" type="button" title="Switch theme" aria-label="Switch theme"></button>
+            </div>
+            <div class="account-actions">
+              <button id="change-password-btn" type="button">Change password</button>
+              <button id="logout-btn" type="button">Log out</button>
+            </div>
+            <form id="change-password-form" hidden>
+              <input type="password" id="current-password" placeholder="Current password" autocomplete="current-password" required />
+              <input type="password" id="new-password" placeholder="New password" autocomplete="new-password" required />
+              <div class="form-actions">
+                <button type="submit">Save</button>
+                <button type="button" id="cancel-password-btn">Cancel</button>
+              </div>
+              <div id="change-password-msg"></div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div id="terminal-body">
+        <div id="placeholder">Select a session or start a new chat.</div>
+        <div id="terminal"></div>
+      </div>
+      <div id="bottom-bar">
+        <div id="current-date"></div>
+      </div>
     </main>
   </div>
   <div id="logged-out" hidden>

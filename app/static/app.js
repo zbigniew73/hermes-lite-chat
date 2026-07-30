@@ -221,7 +221,7 @@ function openTerminal(sessionId) {
   // already been replaced must never write into the *current* terminal.
   const thisTerm = new Terminal({
     cursorBlink: true,
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Menlo, Consolas, 'Courier New', monospace",
   });
   const thisFitAddon = new FitAddon.FitAddon();
@@ -289,6 +289,28 @@ newChatBtn.addEventListener("click", () => {
   // Sidebar would otherwise stay stale until a full reload. (The brand-new
   // session isn't persisted yet, so it won't show up until it is.)
   loadSessions();
+});
+
+// --- settings dropdown ------------------------------------------------------
+
+const settingsEl = document.getElementById("settings");
+const settingsBtn = document.getElementById("settings-btn");
+const settingsPanel = document.getElementById("settings-panel");
+
+function setSettingsOpen(open) {
+  settingsPanel.hidden = !open;
+  settingsBtn.setAttribute("aria-expanded", String(open));
+}
+
+settingsBtn.addEventListener("click", () => {
+  setSettingsOpen(settingsPanel.hidden);
+});
+
+// The wrapper contains the button too, so the click that just opened the panel
+// is ignored here instead of closing it again on its way up to the document.
+document.addEventListener("click", (event) => {
+  if (settingsPanel.hidden || settingsEl.contains(event.target)) return;
+  setSettingsOpen(false);
 });
 
 const changePasswordBtn = document.getElementById("change-password-btn");
@@ -403,6 +425,11 @@ async function logout() {
 
 logoutBtn.addEventListener("click", logout);
 loggedOutReloadBtn.addEventListener("click", () => location.reload());
+
+document.getElementById("current-date").textContent = new Date().toLocaleDateString(
+  undefined,
+  { weekday: "long", day: "numeric", month: "numeric", year: "numeric" }
+);
 
 loadModelInfo();
 loadSessions();
