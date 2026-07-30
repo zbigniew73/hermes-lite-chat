@@ -315,6 +315,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: 150px;
   padding: 0.5rem 1rem;
   flex-shrink: 0;
 }
