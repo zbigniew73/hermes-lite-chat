@@ -43,6 +43,52 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Two tabs resuming the *same* session concurrently behave like two terminals attached to the same `--resume` id — governed by Hermes Agent's own active-session logic, not this app.
 - `/api/hermes/model` and `/api/hermes/sessions` are read-only lookups (YAML/SQLite); this app never writes to Hermes Agent's config or session database directly.
 
+## Autostart on boot (systemd user service)
+
+By default the app only runs while you keep the terminal command open. To have it start automatically at boot and keep running after you log out, run it as a `systemd --user` service — no root/sudo needed for the app itself.
+
+### 1. Enable lingering for your user
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+By default, `systemd --user` services only run while you're logged in (interactively or over SSH) and get killed as soon as your last session ends. `enable-linger` tells systemd to start your user service manager (`user@<uid>.service`) at boot and keep it running independently of any login session, so `hermes-lite-chat` comes up automatically after a reboot and survives logout. Check the status any time with:
+
+```bash
+loginctl show-user "$USER" | grep Linger
+```
+
+(`Linger=yes` means it's active; `loginctl disable-linger "$USER"` reverses it.)
+
+### 2. Install the service
+
+A small, self-contained script generates and installs the unit file for you. It detects the repo location, the `.venv` interpreter, and the current user, so it works regardless of where you cloned the repo or which account runs it:
+
+```bash
+./scripts/install-systemd-user-service.sh
+```
+
+It writes `~/.config/systemd/user/hermes-lite-chat.service`, then runs `daemon-reload` and `enable --now`. Do the Setup steps above first (`.venv` + `pip install -r requirements.txt`) — the script checks for `.venv/bin/python` and exits with a clear message if it's missing.
+
+### 3. Manage it
+
+```bash
+systemctl --user status  hermes-lite-chat   # is it running?
+systemctl --user stop    hermes-lite-chat
+systemctl --user start   hermes-lite-chat
+systemctl --user restart hermes-lite-chat   # e.g. after editing .env
+journalctl --user -u hermes-lite-chat -f    # follow logs
+```
+
+To remove the autostart entirely:
+
+```bash
+systemctl --user disable --now hermes-lite-chat
+rm ~/.config/systemd/user/hermes-lite-chat.service
+systemctl --user daemon-reload
+```
+
 ---
 
 # hermes-lite-chat (wersja polska)
@@ -89,3 +135,49 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Zamknięcie karty przeglądarki kończy proces `hermes chat` powiązany z daną sesją PTY (to nie jest "pauza" — wznowienie tej samej sesji później kontynuuje od tego, co zdążyło się zapisać do `state.db`).
 - Dwie karty wznawiające jednocześnie **tę samą** sesję zachowują się jak dwa terminale podłączone pod to samo `--resume` id — reguluje to własna logika aktywnej sesji Hermes Agent, a nie ta aplikacja.
 - `/api/hermes/model` i `/api/hermes/sessions` to zapytania wyłącznie do odczytu (YAML/SQLite); ta aplikacja nigdy nie zapisuje bezpośrednio do konfiguracji ani bazy sesji Hermes Agent.
+
+## Autostart przy starcie systemu (usługa systemd --user)
+
+Domyślnie aplikacja działa tylko dopóki masz otwarte polecenie w terminalu. Aby uruchamiała się automatycznie przy starcie systemu i działała dalej po wylogowaniu, uruchom ją jako usługę `systemd --user` — sama aplikacja nie wymaga do tego roota/sudo.
+
+### 1. Włącz lingering dla swojego użytkownika
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+Domyślnie usługi `systemd --user` działają tylko wtedy, gdy jesteś zalogowany (interaktywnie lub przez SSH), i są zabijane, gdy kończy się Twoja ostatnia sesja. `enable-linger` mówi systemd, żeby uruchamiał menedżera usług Twojego użytkownika (`user@<uid>.service`) już przy starcie systemu i utrzymywał go niezależnie od jakiejkolwiek sesji logowania — dzięki temu `hermes-lite-chat` wstaje automatycznie po restarcie i działa dalej po wylogowaniu. Stan możesz sprawdzić w każdej chwili:
+
+```bash
+loginctl show-user "$USER" | grep Linger
+```
+
+(`Linger=yes` oznacza, że jest aktywny; `loginctl disable-linger "$USER"` cofa tę zmianę.)
+
+### 2. Zainstaluj usługę
+
+Niewielki, samodzielny skrypt generuje i instaluje plik jednostki (unit file) za Ciebie. Wykrywa lokalizację repozytorium, interpreter z `.venv` oraz bieżącego użytkownika, więc działa niezależnie od tego, gdzie sklonowano repo i na jakim koncie jest uruchamiany:
+
+```bash
+./scripts/install-systemd-user-service.sh
+```
+
+Skrypt zapisuje `~/.config/systemd/user/hermes-lite-chat.service`, a następnie wykonuje `daemon-reload` i `enable --now`. Najpierw wykonaj kroki z sekcji Instalacja powyżej (`.venv` + `pip install -r requirements.txt`) — skrypt sprawdza obecność `.venv/bin/python` i kończy się czytelnym błędem, jeśli go brakuje.
+
+### 3. Zarządzanie
+
+```bash
+systemctl --user status  hermes-lite-chat   # czy działa?
+systemctl --user stop    hermes-lite-chat
+systemctl --user start   hermes-lite-chat
+systemctl --user restart hermes-lite-chat   # np. po edycji .env
+journalctl --user -u hermes-lite-chat -f    # podgląd logów na bieżąco
+```
+
+Aby całkowicie usunąć autostart:
+
+```bash
+systemctl --user disable --now hermes-lite-chat
+rm ~/.config/systemd/user/hermes-lite-chat.service
+systemctl --user daemon-reload
+```
