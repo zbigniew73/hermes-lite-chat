@@ -6,7 +6,7 @@
 # Autor    : Zbigniew Czechowski
 # WWW      : https://automation-ai.eu/
 # E-mail   : kontakt@automation-ai.eu
-# Licencja : MIT - bezpłatna dla wszystkich
+# Licencja : MIT
 # =============================================================================
 #
 # Installs hermes-lite-chat as a systemd --user service, so it starts

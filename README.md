@@ -6,11 +6,13 @@
   Autor    : Zbigniew Czechowski
   WWW      : https://automation-ai.eu/
   E-mail   : kontakt@automation-ai.eu
-  Licencja : MIT - bezpłatna dla wszystkich
+  Licencja : MIT
   =============================================================================
 -->
 
 # Hermes Lite Chat
+
+Your real Hermes Agent CLI, one browser tab away — not a reimplementation.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)

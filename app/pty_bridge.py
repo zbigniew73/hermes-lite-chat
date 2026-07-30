@@ -5,7 +5,7 @@
 # Autor    : Zbigniew Czechowski
 # WWW      : https://automation-ai.eu/
 # E-mail   : kontakt@automation-ai.eu
-# Licencja : MIT - bezpłatna dla wszystkich
+# Licencja : MIT
 # =============================================================================
 
 """Spawn the real `hermes chat --cli` in a PTY and bridge it to a WebSocket.

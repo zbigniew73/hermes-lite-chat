@@ -5,7 +5,7 @@
 # Autor    : Zbigniew Czechowski
 # WWW      : https://automation-ai.eu/
 # E-mail   : kontakt@automation-ai.eu
-# Licencja : MIT - bezpłatna dla wszystkich
+# Licencja : MIT
 # =============================================================================
 
 """hermes-lite-chat's own login store (separate from Hermes Agent's auth).
