@@ -12,9 +12,15 @@
 WebSocket handshake alike (a plain @app.middleware("http") would miss the
 WebSocket scope entirely, so this is a raw ASGI middleware instead).
 
-Also enforces same-origin on WebSocket handshakes: browsers send Basic Auth
-credentials with cross-site WebSocket connections automatically, so auth alone
-does not stop Cross-Site WebSocket Hijacking.
+Also enforces same-origin on WebSocket handshakes and on any HTTP method that
+can change state (everything but GET/HEAD/OPTIONS): browsers attach cached
+Basic Auth credentials to same-origin requests regardless of which page
+triggered them, so auth alone stops neither Cross-Site WebSocket Hijacking
+nor plain CSRF via a cross-origin form POST.
+
+Also throttles repeated failed credential guesses per client IP (see
+auth_store.is_locked_out) — scrypt's cost alone only slows a single-threaded
+guesser, not one spreading attempts across concurrent connections.
 """
 
 import asyncio
@@ -27,6 +33,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app import auth_store
 
 REALM = "hermes-lite-chat"
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 class BasicAuthMiddleware:
@@ -39,14 +46,44 @@ class BasicAuthMiddleware:
             return
 
         # Same-origin check first: this is not an auth check, so valid
-        # credentials must not be able to bypass it.
-        if scope["type"] == "websocket" and not self._is_same_origin(scope):
-            await send({"type": "websocket.close", "code": 1008})
+        # credentials must not be able to bypass it. Applies to WebSocket
+        # handshakes and to any state-changing HTTP method.
+        needs_same_origin = scope["type"] == "websocket" or (
+            scope["type"] == "http" and scope["method"] not in _SAFE_METHODS
+        )
+        if needs_same_origin and not self._is_same_origin(scope):
+            if scope["type"] == "http":
+                response = PlainTextResponse("Cross-origin request rejected", status_code=403)
+                await response(scope, receive, send)
+            else:
+                await send({"type": "websocket.close", "code": 1008})
             return
 
+        client_host = self._client_host(scope)
+        if auth_store.is_locked_out(client_host):
+            if scope["type"] == "http":
+                response = PlainTextResponse(
+                    "Too many failed attempts, try again shortly", status_code=429
+                )
+                await response(scope, receive, send)
+            else:
+                await send({"type": "websocket.close", "code": 1008})
+            return
+
+        headers = dict(scope.get("headers") or [])
+        credentials_sent = headers.get(b"authorization", b"").startswith(b"Basic ")
+
         if await self._is_authorized(scope):
+            if credentials_sent:
+                auth_store.record_success(client_host)
             await self.app(scope, receive, send)
             return
+
+        # Only count it as a brute-force attempt if credentials were actually
+        # guessed — the first, credential-less request every browser sends to
+        # trigger the login prompt is not an attack.
+        if credentials_sent:
+            auth_store.record_failure(client_host)
 
         if scope["type"] == "http":
             response = PlainTextResponse(
@@ -57,6 +94,11 @@ class BasicAuthMiddleware:
             await response(scope, receive, send)
         else:
             await send({"type": "websocket.close", "code": 1008})
+
+    @staticmethod
+    def _client_host(scope: Scope) -> str:
+        client = scope.get("client")
+        return client[0] if client else "unknown"
 
     @staticmethod
     def _is_same_origin(scope: Scope) -> bool:

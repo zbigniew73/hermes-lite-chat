@@ -36,6 +36,11 @@ STATIC_DIR = Path(__file__).parent / "static"
 # Max chunks of PTY output buffered towards the browser before the PTY reader
 # is paused (backpressure; nothing is ever dropped).
 OUTPUT_QUEUE_MAXSIZE = 64
+# Max unflushed bytes buffered in the browser->PTY direction. Unlike the queue
+# above, a slow/stuck PTY here has no backpressure signal to push back on the
+# browser with, so past this cap the session is torn down instead of letting
+# `pending_write` grow without bound.
+MAX_PENDING_WRITE_BYTES = 1_000_000
 # Terminal geometry bounds — anything outside is garbage, not a resize.
 MIN_ROWS = MIN_COLS = 1
 MAX_ROWS = MAX_COLS = 500
@@ -245,6 +250,12 @@ async def delete_session(session_id: str):
 
 @app.websocket("/ws/pty")
 async def ws_pty(websocket: WebSocket, session_id: str | None = None):
+    # Same shape check as delete_session below — defence in depth for the
+    # argv this reaches via pty_bridge.spawn_hermes_pty (--resume <value>).
+    if session_id is not None and not SESSION_ID_RE.fullmatch(session_id):
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
 
     proc, master_fd = pty_bridge.spawn_hermes_pty(session_id)
@@ -331,6 +342,13 @@ async def ws_pty(websocket: WebSocket, session_id: str | None = None):
         (large pastes) and raises BlockingIOError once its buffer is full.
         """
         if pending_write:
+            if len(pending_write) + len(data) > MAX_PENDING_WRITE_BYTES:
+                logger.info(
+                    "pty write buffer exceeded %d bytes; closing session",
+                    MAX_PENDING_WRITE_BYTES,
+                )
+                eof_event.set()
+                return
             pending_write.extend(data)
             return
         view = memoryview(data)
@@ -338,6 +356,13 @@ async def ws_pty(websocket: WebSocket, session_id: str | None = None):
             try:
                 written = os.write(master_fd, view)
             except BlockingIOError:
+                if len(pending_write) + len(view) > MAX_PENDING_WRITE_BYTES:
+                    logger.info(
+                        "pty write buffer exceeded %d bytes; closing session",
+                        MAX_PENDING_WRITE_BYTES,
+                    )
+                    eof_event.set()
+                    return
                 pending_write.extend(view)
                 if not state["writer_registered"]:
                     loop.add_writer(master_fd, flush_pending)

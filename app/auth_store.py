@@ -88,6 +88,46 @@ def clear_verify_cache() -> None:
     _verify_cache.clear()
 
 
+# --- brute-force throttling --------------------------------------------------
+# Per-client-IP failure tracking, in memory only (resets on restart, same as
+# the verification cache above). This is a last-resort backstop against a
+# single naive brute-force loop hammering this process directly — it is not a
+# substitute for network-level protections when this app sits behind a
+# reverse proxy (see the README's security recommendations), since every
+# request may then appear to come from the proxy's own IP.
+_FAILURE_WINDOW_SECONDS = 60.0
+_FAILURE_THRESHOLD = 10
+_MAX_TRACKED_CLIENTS = 256
+_failures: dict[str, list[float]] = {}
+
+
+def _prune(times: list[float], now: float) -> None:
+    cutoff = now - _FAILURE_WINDOW_SECONDS
+    while times and times[0] < cutoff:
+        times.pop(0)
+
+
+def is_locked_out(client_host: str) -> bool:
+    times = _failures.get(client_host)
+    if not times:
+        return False
+    _prune(times, time.monotonic())
+    return len(times) >= _FAILURE_THRESHOLD
+
+
+def record_failure(client_host: str) -> None:
+    now = time.monotonic()
+    if client_host not in _failures and len(_failures) >= _MAX_TRACKED_CLIENTS:
+        _failures.clear()
+    times = _failures.setdefault(client_host, [])
+    times.append(now)
+    _prune(times, now)
+
+
+def record_success(client_host: str) -> None:
+    _failures.pop(client_host, None)
+
+
 # --- store ------------------------------------------------------------------
 
 
